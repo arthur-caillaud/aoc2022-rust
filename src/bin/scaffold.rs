@@ -11,18 +11,18 @@ use std::{
 const MODULE_TEMPLATE: &str = r###"use advent_of_code::helpers::*;
 use advent_of_code::solve;
 
-pub fn part_one(input: &str) -> Option<u32> {
-    None
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
-    None
-}
-
 fn main() {
     let input = &read_input(DAY);
-    solve!(1, part_one, input);
-    solve!(2, part_two, input);
+    solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
+}
+
+pub fn solve_part_1(input: &str) -> Option<u64> {
+    None
+}
+
+pub fn solve_part_2(input: &str) -> Option<u64> {
+    None
 }
 
 #[cfg(test)]
@@ -30,16 +30,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_part_one() {
-        let input = &read_example(DAY);
-        assert_eq!(part_one(&input), None);
-    }
-
-    #[test]
-    fn test_part_two() {
-        let input = &read_example(DAY);
-        assert_eq!(part_two(&input), None);
-    }
+    fn test() {}
 }
 "###;
 
