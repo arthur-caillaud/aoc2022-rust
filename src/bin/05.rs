@@ -6,10 +6,19 @@ use advent_of_code::solve;
 
 fn main() {
     let input = &read_input(5);
-    solve!(1, solve_part_1, &input)
+    solve!(1, solve_part_1, &input);
+    solve!(1, solve_part_2, &input);
 }
 
 fn solve_part_1(input: &str) -> Option<String> {
+    solve(input, Stacks::m_apply)
+}
+
+fn solve_part_2(input: &str) -> Option<String> {
+    solve(input, Stacks::m_apply_2)
+}
+
+fn solve(input: &str, m_apply: fn(&mut Stacks, Vec<Step>)) -> Option<String> {
     let mut split = input.split("\n\n");
     let stack_input = split.next().unwrap();
     let steps_input = split.next().unwrap();
@@ -17,17 +26,11 @@ fn solve_part_1(input: &str) -> Option<String> {
     let mut stacks = Stacks::from_str(stack_input);
     let steps = steps_input.parse::<Steps>().unwrap();
 
-    stacks.m_apply(steps.0);
+    m_apply(&mut stacks, steps.0);
     Some(stacks.get_message())
 }
 
 struct Steps(Vec<Step>);
-
-impl Steps {
-    fn nth(&self, i: u64) -> &Step {
-        &self.0[i as usize]
-    }
-}
 
 impl FromStr for Steps {
     type Err = String;
@@ -79,8 +82,21 @@ impl Stacks {
         steps.iter().for_each(|step| self.apply(step))
     }
 
+    fn m_apply_2(&mut self, steps: Vec<Step>) {
+        steps.iter().for_each(|step| self.apply_2(step))
+    }
+
     fn apply(&mut self, step: &Step) {
         (0..step.count).for_each(|_| self.move_one(step.from, step.to));
+    }
+
+    fn apply_2(&mut self, step: &Step) {
+        let mut src_stack = std::mem::replace(&mut self.0[step.from as usize - 1].0, vec![]);
+        let len = src_stack.len();
+        let start = len - step.count as usize;
+        let products_to_move: Vec<_> = src_stack.splice(start.., vec![]).collect();
+        self.0[step.from as usize - 1].0 = src_stack;
+        self.0[step.to as usize - 1].0.extend(products_to_move);
     }
 
     fn move_one(&mut self, from: u64, to: u64) {
@@ -176,14 +192,22 @@ mod tests {
     }
 
     #[test]
+    fn test_solve_2() {
+        let input = read_example(5);
+        let res = solve_part_2(&input).unwrap();
+
+        assert_eq!(res, "MCD")
+    }
+
+    #[test]
     fn test_parse_steps() {
         let input = read_example(5);
         let step_lines = input.split("\n\n").nth(1).unwrap();
         let steps = step_lines.parse::<Steps>().unwrap();
 
-        assert_eq!(steps.nth(0).from, 2);
-        assert_eq!(steps.nth(1).count, 3);
-        assert_eq!(steps.nth(2).to, 1);
+        assert_eq!(steps.0[0].from, 2);
+        assert_eq!(steps.0[1].count, 3);
+        assert_eq!(steps.0[2].to, 1);
     }
 
     #[test]
