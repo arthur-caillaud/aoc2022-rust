@@ -17,11 +17,11 @@ fn main() {
     solve!(2, solve_part_2, input);
 }
 
-pub fn solve_part_1(input: &str) -> Option<u64> {
+fn solve_part_1(input: &str) -> Option<u64> {
     None
 }
 
-pub fn solve_part_2(input: &str) -> Option<u64> {
+fn solve_part_2(input: &str) -> Option<u64> {
     None
 }
 
