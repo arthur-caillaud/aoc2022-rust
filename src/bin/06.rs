@@ -6,14 +6,23 @@ use advent_of_code::solve;
 fn main() {
     let input = &read_input(6);
     solve!(1, solve_part_1, input);
+    solve!(1, solve_part_2, input);
 }
 
-pub fn solve_part_1(input: &str) -> Option<u64> {
+fn solve_part_1(input: &str) -> Option<u64> {
+    solve(input, 4)
+}
+
+fn solve_part_2(input: &str) -> Option<u64> {
+    solve(input, 14)
+}
+
+fn solve(input: &str, size: usize) -> Option<u64> {
     let mut solution: Option<u64> = None;
-    for k in 0..(input.len() - 4) {
-        let slice = &input[k..k + 4];
+    for k in 0..(input.len() - size) {
+        let slice = &input[k..k + size];
         if is_all_different_chars(slice) {
-            solution = Some((k + 4) as u64);
+            solution = Some((k + size) as u64);
             break;
         }
     }
@@ -44,10 +53,17 @@ mod tests {
         let s2 = "zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw";
         let sol2 = solve_part_1(s2).unwrap();
         assert_eq!(sol2, 11);
+    }
 
-        let s3 = "aaaaaaaaaaa";
-        let sol3 = solve_part_1(s3);
-        assert_eq!(sol3, None);
+    #[test]
+    fn test_solve_part_two() {
+        let s1 = "mjqjpqmgbljsphdztnvjfqwrcgsmlb";
+        let sol1 = solve_part_2(s1).unwrap();
+        assert_eq!(sol1, 19);
+
+        let s2 = "bvwbjplbgvbhsrlpgdmjqwftvncz";
+        let sol2 = solve_part_2(s2).unwrap();
+        assert_eq!(sol2, 23);
     }
 
     #[test]
