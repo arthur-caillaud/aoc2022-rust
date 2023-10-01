@@ -4,12 +4,22 @@ use advent_of_code::solve;
 fn main() {
     let input = &read_input(8);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
 fn solve_part_1(input: &str) -> Option<u32> {
     let forest = Forest::new(input);
     let visible_trees = forest.get_visible_trees();
     Some(visible_trees.len() as u32)
+}
+
+fn solve_part_2(input: &str) -> Option<u32> {
+    let forest = Forest::new(input);
+    forest
+        .map(|pos| forest.get_scenic_score(pos))
+        .iter()
+        .max()
+        .copied()
 }
 
 #[derive(Debug)]
@@ -61,6 +71,37 @@ impl Forest {
         })
     }
 
+    /// Gets the scenic score for tree at `pos`
+    fn get_scenic_score(&self, pos: (u32, u32)) -> u32 {
+        Direction::VALUES
+            .map(|direction| self.get_viewing_distance_from(pos, &direction))
+            .into_iter()
+            .reduce(|acc, dist| acc * dist)
+            .unwrap()
+    }
+
+    /// Gets the viewing distance from `pos` in `direction`
+    fn get_viewing_distance_from(&self, pos: (u32, u32), direction: &Direction) -> u32 {
+        let hedge = self.get_directed_hedge(pos, direction);
+        let mut distance = 0;
+        for tree in hedge {
+            distance += 1;
+            if tree >= self.size(pos) {
+                break;
+            }
+        }
+        distance as u32
+    }
+
+    /// Useful when wanting to walk the hedge from the center outwards
+    fn get_directed_hedge(&self, pos: (u32, u32), direction: &Direction) -> Vec<&u32> {
+        let mut hedge = self.get_hedge(pos, direction);
+        if direction == &Direction::Top || direction == &Direction::Left {
+            hedge.reverse();
+        }
+        hedge
+    }
+
     /// Retrieves all the trees matching for the provided `predicate`
     fn filter<F>(&self, predicate: F) -> Vec<&u32>
     where
@@ -78,8 +119,26 @@ impl Forest {
 
         trees
     }
+
+    /// Retrieves all the trees matching for the provided `predicate`
+    fn map<F>(&self, predicate: F) -> Vec<u32>
+    where
+        F: Fn((u32, u32)) -> u32,
+    {
+        let mut values = vec![];
+
+        self.0.iter().enumerate().for_each(|(i, hedge)| {
+            hedge
+                .iter()
+                .enumerate()
+                .for_each(|(j, tree)| values.push(predicate((i as u32, j as u32))))
+        });
+
+        values
+    }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum Direction {
     Top,
     Bottom,
@@ -97,10 +156,33 @@ mod tests {
     #[test]
     fn test_solve_part_1() {
         let input = read_example(8);
-        let forest = Forest::new(&input);
-        let visible_trees = forest.get_visible_trees();
+        let solution = solve_part_1(&input).unwrap();
+        assert_eq!(solution, 21);
+    }
 
-        assert_eq!(visible_trees.len(), 21);
+    #[test]
+    fn test_solve_part_2() {
+        let input = read_example(8);
+        let solution = solve_part_2(&input).unwrap();
+        assert_eq!(solution, 8);
+    }
+
+    #[test]
+    fn test_viewing_distance() {
+        let input = read_example(8);
+        let forest = Forest::new(&input);
+
+        assert_eq!(forest.get_viewing_distance_from((1, 2), &Direction::Top), 1);
+    }
+
+    #[test]
+    fn test_scenic_score() {
+        let input = read_example(8);
+        let forest = Forest::new(&input);
+
+        assert_eq!(forest.get_scenic_score((0, 0)), 0);
+        assert_eq!(forest.get_scenic_score((1, 2)), 4);
+        assert_eq!(forest.get_scenic_score((3, 2)), 8);
     }
 
     #[test]
