@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::iter::once;
 use std::iter::Peekable;
 use std::str::Lines;
 
@@ -8,6 +9,7 @@ use advent_of_code::solve;
 fn main() {
     let input = &read_input(7);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
 fn solve_part_1(input: &str) -> Option<u32> {
@@ -17,6 +19,17 @@ fn solve_part_1(input: &str) -> Option<u32> {
     let sum = fs.root.find_small_dirs().iter().map(|dir| dir.size()).sum();
 
     Some(sum)
+}
+
+fn solve_part_2(input: &str) -> Option<u32> {
+    let commands = FsCommand::parse(input);
+    let mut fs = Fs::new();
+    fs.exec_multiple(commands);
+    let to_free = fs.get_space_to_free();
+    let dir = fs.root.find_smallest_bigger_than(to_free)?;
+    let solution = dir.size();
+
+    Some(solution)
 }
 
 #[derive(Debug)]
@@ -74,6 +87,13 @@ impl Fs {
         }
 
         Some(current)
+    }
+
+    /// Returns amout of space to free to run update
+    fn get_space_to_free(&self) -> u32 {
+        let used_space = self.root.size();
+        let available_space = 70000000 - used_space;
+        30000000 - available_space
     }
 }
 
@@ -192,7 +212,24 @@ impl Dir {
         })
     }
 
-    /// Return the list of directories (children and self included) smaller than 100kB
+    /// Finds the smallest directory bigger than provided `size` (among children and self)
+    fn find_smallest_bigger_than(&self, size: u32) -> Option<&Dir> {
+        if self.size() < size {
+            None
+        } else {
+            once(self)
+                .chain(self.children.iter().filter_map(|(_, child)| {
+                    if let Node::Dir(dir) = child {
+                        dir.find_smallest_bigger_than(size)
+                    } else {
+                        None
+                    }
+                }))
+                .min_by(|a, b| a.size().cmp(&b.size()))
+        }
+    }
+
+    /// Return the list of directories (among children and self) smaller than 100kB
     fn find_small_dirs(&self) -> Vec<&Dir> {
         let mut dirs = vec![];
 
@@ -222,11 +259,27 @@ mod tests {
     }
 
     #[test]
+    fn test_solve_part_two() {
+        let input = read_example(7);
+        let solution = solve_part_2(&input).unwrap();
+        assert_eq!(solution, 24933642)
+    }
+
+    #[test]
     fn test_get_current() {
         let mut fs = Fs::new();
         fs.exec(&FsCommand::CD(String::from("/")));
         let current_dir = fs.get_current().unwrap();
         assert_eq!(current_dir.name, "/");
+    }
+
+    #[test]
+    fn test_space_to_free() {
+        let input = read_example(7);
+        let commands = FsCommand::parse(&input);
+        let mut fs = Fs::new();
+        fs.exec_multiple(commands);
+        assert_eq!(fs.get_space_to_free(), 8381165)
     }
 
     #[test]
