@@ -13,7 +13,8 @@ fn solve_part_1(input: &str) -> Option<u32> {
 }
 
 #[derive(Debug)]
-struct Forest(Vec<Vec<u32>>);
+struct Forest(Vec<Vec<Tree>>);
+type Tree = u32;
 impl Forest {
     /// Build a new `Forest` by parsing the provided `String`
     fn new(s: &str) -> Self {
@@ -32,14 +33,13 @@ impl Forest {
 
     /// Whether the tree at `pos` is visible
     fn tree_is_visible(&self, pos: (u32, u32)) -> bool {
-        self.tree_is_visible_from(pos, Direction::Bottom)
-            || self.tree_is_visible_from(pos, Direction::Top)
-            || self.tree_is_visible_from(pos, Direction::Left)
-            || self.tree_is_visible_from(pos, Direction::Right)
+        Direction::VALUES
+            .iter()
+            .any(|direction| self.tree_is_visible_from(pos, direction))
     }
 
     /// Whether the tree at `pos` is visible from `direction`
-    fn tree_is_visible_from(&self, pos: (u32, u32), direction: Direction) -> bool {
+    fn tree_is_visible_from(&self, pos: (u32, u32), direction: &Direction) -> bool {
         let hedge = self.get_hedge(pos, direction);
         let is_not_visible = hedge.iter().any(|&tree| tree >= self.size(pos));
 
@@ -52,7 +52,7 @@ impl Forest {
     }
 
     /// Retrieves the hedge made by trees extending from `pos` in the provided `direction`
-    fn get_hedge(&self, pos: (u32, u32), direction: Direction) -> Vec<&u32> {
+    fn get_hedge(&self, pos: (u32, u32), direction: &Direction) -> Vec<&u32> {
         self.filter(|(i, j)| match direction {
             Direction::Bottom => i as u32 > pos.0 && j as u32 == pos.1,
             Direction::Left => i as u32 == pos.0 && (j as u32) < pos.1,
@@ -85,6 +85,9 @@ enum Direction {
     Bottom,
     Left,
     Right,
+}
+impl Direction {
+    const VALUES: [Self; 4] = [Self::Top, Self::Bottom, Self::Left, Self::Right];
 }
 
 #[cfg(test)]
@@ -126,15 +129,15 @@ mod tests {
         let input = read_example(8);
         let forest = Forest::new(&input);
 
-        let hedge_1 = forest.get_hedge((1, 1), Direction::Top);
+        let hedge_1 = forest.get_hedge((1, 1), &Direction::Top);
         assert_eq!(hedge_1.len(), 1);
         assert_eq!(hedge_1[0], &0);
 
-        let hedge_2 = forest.get_hedge((3, 3), Direction::Left);
+        let hedge_2 = forest.get_hedge((3, 3), &Direction::Left);
         assert_eq!(hedge_2.len(), 3);
         assert_eq!(hedge_2[1], &3);
 
-        let hedge_3 = forest.get_hedge((4, 0), Direction::Bottom);
+        let hedge_3 = forest.get_hedge((4, 0), &Direction::Bottom);
         assert_eq!(hedge_3.len(), 0);
     }
 }
