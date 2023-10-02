@@ -7,6 +7,7 @@ use advent_of_code::solve;
 fn main() {
     let input = &read_input(9);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
 fn solve_part_1(input: &str) -> Option<u32> {
@@ -14,6 +15,15 @@ fn solve_part_1(input: &str) -> Option<u32> {
     let moves = Move::from(&input);
     grid.exec_multiple(moves);
     let solution = grid.get_visited(1);
+
+    Some(solution)
+}
+
+fn solve_part_2(input: &str) -> Option<u32> {
+    let mut grid = Grid::new(10);
+    let moves = Move::from(&input);
+    grid.exec_multiple(moves);
+    let solution = grid.get_visited(9);
 
     Some(solution)
 }
@@ -54,8 +64,7 @@ impl Grid {
     /// `head` and reconciling the `tail`
     fn move_once(&mut self, mv: &Move) {
         self.move_node(0, &mv.0);
-        self.visited[0].insert(self.nodes[0], true);
-        (1..self.nodes.len()).for_each(|k| {
+        (0..self.nodes.len()).for_each(|k| {
             self.reconcile_node(k);
             self.visited[k].insert(self.nodes[k], true);
         });
