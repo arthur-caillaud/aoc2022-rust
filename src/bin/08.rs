@@ -131,7 +131,7 @@ impl Forest {
             hedge
                 .iter()
                 .enumerate()
-                .for_each(|(j, tree)| values.push(predicate((i as u32, j as u32))))
+                .for_each(|(j, _)| values.push(predicate((i as u32, j as u32))))
         });
 
         values
