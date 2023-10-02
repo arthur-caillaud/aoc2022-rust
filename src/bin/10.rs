@@ -4,6 +4,7 @@ use advent_of_code::solve;
 fn main() {
     let input = &read_input(10);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
 fn solve_part_1(input: &str) -> Option<i32> {
@@ -11,6 +12,16 @@ fn solve_part_1(input: &str) -> Option<i32> {
     let mut cpu = CPU::new();
     cpu.exec(commands);
     let solution = cpu.get_strength();
+
+    Some(solution)
+}
+
+fn solve_part_2(input: &str) -> Option<String> {
+    let commands = Command::from(input);
+    let mut cpu = CPU::new();
+    cpu.exec(commands);
+    let screen = Screen::from(cpu);
+    let solution = screen.print();
 
     Some(solution)
 }
@@ -90,6 +101,70 @@ impl Command {
     }
 }
 
+struct Screen(Vec<Vec<Pixel>>);
+impl Screen {
+    /// Builds a `Screen` from the values
+    fn from(cpu: CPU) -> Self {
+        let mut screen: Self = Screen(vec![]);
+        cpu.x.iter().enumerate().for_each(|(cycle, &x)| {
+            let position = Pixel::get_position(cycle + 1);
+            let pixel = Pixel::from(cycle + 1, x);
+            if let Some(row) = screen.0.get_mut(position.0) {
+                row.push(pixel);
+            } else {
+                screen.0.push(vec![pixel]);
+            }
+        });
+
+        screen
+    }
+
+    /// Prints the `Screen` by outputing a `String` containing all printed `Pixels`
+    fn print(&self) -> String {
+        let mut image = String::from("");
+        self.0.iter().for_each(|row| {
+            row.iter().for_each(|pixel| {
+                image.push(pixel.print());
+            });
+            image.push('\n');
+        });
+
+        image
+    }
+}
+
+enum Pixel {
+    Lit,
+    Dark,
+}
+impl Pixel {
+    /// Builds a new pixel from the CPU `cycle` value and `x` register value
+    fn from(cycle: usize, x: i32) -> Self {
+        let column = Pixel::get_position(cycle).1 as i32;
+        let distance = column - x;
+        match distance.abs() {
+            0 | 1 => Self::Lit,
+            _ => Self::Dark,
+        }
+    }
+
+    /// Prints the `Pixel` by converting it into a `char`
+    fn print(&self) -> char {
+        match self {
+            Pixel::Dark => '.',
+            Pixel::Lit => '#',
+        }
+    }
+
+    /// Retrieves the position a `Pixel` from the CPU `cycle`
+    fn get_position(cycle: usize) -> (usize, usize) {
+        let column = (cycle - 1) % 40;
+        let row = (cycle - 1) / 40;
+
+        (row, column)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,5 +204,22 @@ mod tests {
         let solution = solve_part_1(&input).unwrap();
 
         assert_eq!(solution, 13140)
+    }
+
+    #[test]
+    fn test_print_pixel() {
+        let pixel1 = Pixel::from(8, 11);
+        assert_eq!(pixel1.print(), '.');
+
+        let pixel2 = Pixel::from(13, 12);
+        assert_eq!(pixel2.print(), '#');
+    }
+
+    #[test]
+    fn test_solve_2() {
+        let input = read_example(10);
+        let solution = solve_part_2(&input).unwrap();
+
+        println!("{}", solution)
     }
 }
