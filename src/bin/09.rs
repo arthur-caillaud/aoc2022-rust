@@ -10,34 +10,34 @@ fn main() {
 }
 
 fn solve_part_1(input: &str) -> Option<u32> {
-    let mut grid = Grid::new();
+    let mut grid = Grid::new(2);
     let moves = Move::from(&input);
     grid.exec_multiple(moves);
-    let solution = grid.get_visited();
+    let solution = grid.get_visited(1);
 
     Some(solution)
 }
 
 struct Grid {
-    head: Cell,
-    tail: Cell,
-    visited: HashMap<Cell, bool>,
+    nodes: Vec<Cell>,
+    visited: Vec<HashMap<Cell, bool>>,
 }
 impl Grid {
     /// Build a new `Grid` with cells initialized at `(0,0)`
-    fn new() -> Self {
-        let mut visited = HashMap::new();
-        visited.insert(Cell(0, 0), true);
+    fn new(nodes: u32) -> Self {
+        let mut visited: Vec<HashMap<Cell, bool>> = (0..nodes).map(|_| HashMap::new()).collect();
+        (0..nodes).for_each(|i| {
+            visited[i as usize].insert(Cell(0, 0), true);
+        });
         Self {
-            head: Cell(0, 0),
-            tail: Cell(0, 0),
+            nodes: (0..nodes).map(|_| Cell(0, 0)).collect(),
             visited,
         }
     }
 
-    /// Retrieves the number of cells that have been visited
-    fn get_visited(&self) -> u32 {
-        self.visited.keys().len() as u32
+    /// Retrieves the number of cells that have been visited by node `k`
+    fn get_visited(&self, k: u32) -> u32 {
+        self.visited[k as usize].keys().len() as u32
     }
 
     /// Executes multiples `Moves` on the `Grid`
@@ -50,29 +50,30 @@ impl Grid {
         (0..mv.1).for_each(|_| self.move_once(&mv));
     }
 
-    /// Executes a `Move` once into its `direction` by running the
+    /// Executes a `Move` once into its `direction` by moving the
     /// `head` and reconciling the `tail`
     fn move_once(&mut self, mv: &Move) {
-        self.move_head_once(&mv.0);
-        self.reconcile_tail();
-        self.visited.insert(self.tail, true);
-    }
-
-    /// Moves the `head` into `direction`
-    fn move_head_once(&mut self, dir: &Direction) {
-        Self::move_cell(&mut self.head, dir)
+        self.move_node(0, &mv.0);
+        self.visited[0].insert(self.nodes[0], true);
+        (1..self.nodes.len()).for_each(|k| {
+            self.reconcile_node(k);
+            self.visited[k].insert(self.nodes[k], true);
+        });
     }
 
     /// Reconciles the `tail` with the position of the `head`
-    fn reconcile_tail(&mut self) {
-        let distance = self.head - self.tail;
+    fn reconcile_node(&mut self, k: usize) {
+        if k == 0 {
+            return;
+        }
+        let distance = self.nodes[k - 1] - self.nodes[k];
         let moves = Direction::from_distance(distance);
-        moves.iter().for_each(|dir| self.move_tail_once(dir))
+        moves.iter().for_each(|dir| self.move_node(k, dir))
     }
 
     /// Moves the `tail` into `direction`
-    fn move_tail_once(&mut self, dir: &Direction) {
-        Self::move_cell(&mut self.tail, dir)
+    fn move_node(&mut self, k: usize, dir: &Direction) {
+        Self::move_cell(&mut self.nodes[k], dir)
     }
 
     /// Moves the provided `cell` into `direction`
@@ -180,10 +181,7 @@ mod tests {
     #[test]
     fn test_solve_part_1() {
         let input = read_example(9);
-        let moves = Move::from(&input);
-        let mut grid = Grid::new();
-        grid.exec_multiple(moves);
-        let solution = grid.get_visited();
+        let solution = solve_part_1(&input).unwrap();
 
         assert_eq!(solution, 13);
     }
@@ -200,36 +198,36 @@ mod tests {
 
     #[test]
     fn test_exec_move() {
-        let mut grid = Grid::new();
+        let mut grid = Grid::new(2);
         let mv = Move(Direction::Right, 4);
         grid.exec(&mv);
 
-        assert_eq!(grid.head.0, 4);
-        assert_eq!(grid.head.1, 0);
-        assert_eq!(grid.tail.0, 3);
-        assert_eq!(grid.tail.1, 0);
+        assert_eq!(grid.nodes[0].0, 4);
+        assert_eq!(grid.nodes[0].1, 0);
+        assert_eq!(grid.nodes[1].0, 3);
+        assert_eq!(grid.nodes[1].1, 0);
     }
 
     #[test]
     fn test_move_head() {
-        let mut grid = Grid::new();
-        grid.move_head_once(&Direction::Right);
-        grid.move_head_once(&Direction::Right);
-        grid.move_head_once(&Direction::Down);
+        let mut grid = Grid::new(2);
+        grid.move_node(0, &Direction::Right);
+        grid.move_node(0, &Direction::Right);
+        grid.move_node(0, &Direction::Down);
 
-        assert_eq!(grid.head.0, 2);
-        assert_eq!(grid.head.1, -1);
+        assert_eq!(grid.nodes[0].0, 2);
+        assert_eq!(grid.nodes[0].1, -1);
     }
 
     #[test]
     fn test_reconcile_tail() {
-        let mut grid = Grid::new();
-        grid.move_head_once(&Direction::Left);
-        grid.move_head_once(&Direction::Left);
-        grid.move_head_once(&Direction::Down);
-        grid.reconcile_tail();
+        let mut grid = Grid::new(2);
+        grid.move_node(0, &Direction::Left);
+        grid.move_node(0, &Direction::Left);
+        grid.move_node(0, &Direction::Down);
+        grid.reconcile_node(1);
 
-        assert_eq!(grid.tail.0, -1);
-        assert_eq!(grid.tail.1, -1);
+        assert_eq!(grid.nodes[1].0, -1);
+        assert_eq!(grid.nodes[1].1, -1);
     }
 }
