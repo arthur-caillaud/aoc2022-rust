@@ -5,11 +5,20 @@ use regex::Regex;
 fn main() {
     let input = &read_input(11);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
-fn solve_part_1(input: &str) -> Option<u32> {
-    let mut monkeys = Monkeys::parse(input);
+fn solve_part_1(input: &str) -> Option<usize> {
+    let mut monkeys = Monkeys::parse(input, true);
     monkeys.run_n_round(20);
+    let solution = monkeys.get_monkey_business();
+
+    Some(solution)
+}
+
+fn solve_part_2(input: &str) -> Option<usize> {
+    let mut monkeys = Monkeys::parse(input, false);
+    monkeys.run_n_round(10000);
     let solution = monkeys.get_monkey_business();
 
     Some(solution)
@@ -19,27 +28,31 @@ fn solve_part_1(input: &str) -> Option<u32> {
 struct Monkeys(Vec<Monkey>);
 impl Monkeys {
     /// Parses multiple `Monkeys` from a block of input text
-    fn parse(txt: &str) -> Self {
-        Self(txt.split("\n\n").map(Monkey::parse).collect())
+    fn parse(text: &str, with_relief: bool) -> Self {
+        Self(
+            text.split("\n\n")
+                .map(|txt| Monkey::parse(txt, with_relief))
+                .collect(),
+        )
     }
 
     /// Retrieves the current level of monkey business
-    fn get_monkey_business(&self) -> u32 {
+    fn get_monkey_business(&self) -> usize {
         let most_active = self.get_n_most_active(2);
 
         most_active[0] * most_active[1]
     }
 
     /// Retrieves the values of `inspected` for `n` most active `Monkeys`
-    fn get_n_most_active(&self, n: u32) -> Vec<u32> {
-        let mut inspected: Vec<u32> = self.0.iter().map(|monkey| monkey.inspected).collect();
+    fn get_n_most_active(&self, n: usize) -> Vec<usize> {
+        let mut inspected: Vec<usize> = self.0.iter().map(|monkey| monkey.inspected).collect();
         inspected.sort_by(|a, b| b.cmp(a));
 
         inspected[0..n as usize].to_vec()
     }
 
     /// Runs `n` full rounds
-    fn run_n_round(&mut self, n: u32) {
+    fn run_n_round(&mut self, n: usize) {
         (0..n).for_each(|_| self.run_round());
     }
 
@@ -50,7 +63,8 @@ impl Monkeys {
 
     /// Runs a round for `Monkey` k
     fn run_monkey_round(&mut self, k: usize) {
-        let items = self.0.get_mut(k).unwrap().inspect_all();
+        let common_multiple: usize = self.0.iter().map(|m| m.divisible_test).product();
+        let items: Vec<(usize, usize)> = self.0.get_mut(k).unwrap().inspect_all(common_multiple);
 
         for (k, item) in &items {
             if let Some(target_monkey) = self.0.get_mut(*k as usize) {
@@ -62,35 +76,41 @@ impl Monkeys {
 
 #[derive(Debug)]
 struct Monkey {
-    items: Vec<u32>,
+    items: Vec<usize>,
     operation: Operation,
-    divisible_test: u32,
-    target_monkey_test_true: u32,
-    target_monkey_test_false: u32,
-    inspected: u32,
+    divisible_test: usize,
+    target_monkey_test_true: usize,
+    target_monkey_test_false: usize,
+    inspected: usize,
+    with_relief: bool,
 }
 impl Monkey {
     /// `Monkey` inspects all of its items and returns a list of `(target_money, item)`
-    fn inspect_all(&mut self) -> Vec<(u32, u32)> {
-        (0..self.items.len()).map(|_| self.inspect()).collect()
+    fn inspect_all(&mut self, modulo: usize) -> Vec<(usize, usize)> {
+        (0..self.items.len())
+            .map(|_| self.inspect(modulo))
+            .collect()
     }
 
     /// `Monkey` inspects the first item in its list and returns `(target_monkey, item)`
-    fn inspect(&mut self) -> (u32, u32) {
+    fn inspect(&mut self, modulo: usize) -> (usize, usize) {
         let item = self.items.remove(0);
-        let worried = self.worry(item);
-        let bored = (worried as f32 / 3_f32).floor() as u32;
+        let new = if self.with_relief {
+            self.worry(item) / 3
+        } else {
+            self.worry(item) % modulo
+        };
         self.inspected += 1;
 
-        if bored % self.divisible_test == 0 {
-            (self.target_monkey_test_true, bored)
+        if new % self.divisible_test == 0 {
+            (self.target_monkey_test_true, new)
         } else {
-            (self.target_monkey_test_false, bored)
+            (self.target_monkey_test_false, new)
         }
     }
 
     /// Takes an `item` as input and update worry level
-    fn worry(&mut self, item: u32) -> u32 {
+    fn worry(&mut self, item: usize) -> usize {
         match self.operation {
             Operation::Add(x) => item + x,
             Operation::AddOld => item + item,
@@ -100,8 +120,8 @@ impl Monkey {
     }
 
     /// Parses a `Monkey` from a block of input text
-    fn parse(txt: &str) -> Self {
-        let mut monkey = Monkey::new();
+    fn parse(txt: &str, with_relief: bool) -> Self {
+        let mut monkey = Monkey::new(with_relief);
         let mut lines = txt.lines();
         lines.next();
         monkey.parse_items(lines.next().unwrap());
@@ -114,7 +134,7 @@ impl Monkey {
     }
 
     /// Builds a blank `Monkey`. Should not be used.
-    fn new() -> Self {
+    fn new(with_relief: bool) -> Self {
         Self {
             items: vec![],
             operation: Operation::AddOld,
@@ -122,6 +142,7 @@ impl Monkey {
             target_monkey_test_true: 0,
             target_monkey_test_false: 0,
             inspected: 0,
+            with_relief,
         }
     }
 
@@ -131,7 +152,7 @@ impl Monkey {
         let caps = reg.captures(line).unwrap();
         let items_txt = caps.get(1).unwrap().as_str().split(", ");
         self.items = items_txt
-            .map(|token| token.parse::<u32>().unwrap())
+            .map(|token| token.parse::<usize>().unwrap())
             .collect();
     }
 
@@ -147,7 +168,7 @@ impl Monkey {
     fn parse_divisible_test(&mut self, line: &str) {
         let reg = Regex::new("Test: divisible by (\\d+)$").unwrap();
         let caps = reg.captures(line).unwrap();
-        let value = caps.get(1).unwrap().as_str().parse::<u32>().unwrap();
+        let value = caps.get(1).unwrap().as_str().parse::<usize>().unwrap();
         self.divisible_test = value;
     }
 
@@ -155,7 +176,7 @@ impl Monkey {
     fn parse_throw_monkey(&mut self, line: &str) {
         let reg = Regex::new("If (.+): throw to monkey (\\d+)$").unwrap();
         let caps = reg.captures(line).unwrap();
-        let monkey = caps.get(2).unwrap().as_str().parse::<u32>().unwrap();
+        let monkey = caps.get(2).unwrap().as_str().parse::<usize>().unwrap();
 
         match caps.get(1).unwrap().as_str() {
             "true" => self.target_monkey_test_true = monkey,
@@ -167,9 +188,9 @@ impl Monkey {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Operation {
-    Add(u32),
+    Add(usize),
     AddOld,
-    Mult(u32),
+    Mult(usize),
     MultOld,
 }
 impl Operation {
@@ -179,8 +200,8 @@ impl Operation {
         match (tokens.next(), tokens.next()) {
             (Some("*"), Some("old")) => Operation::MultOld,
             (Some("+"), Some("old")) => Operation::AddOld,
-            (Some("*"), Some(x)) => Operation::Mult(x.parse::<u32>().unwrap()),
-            (Some("+"), Some(x)) => Operation::Add(x.parse::<u32>().unwrap()),
+            (Some("*"), Some(x)) => Operation::Mult(x.parse::<usize>().unwrap()),
+            (Some("+"), Some(x)) => Operation::Add(x.parse::<usize>().unwrap()),
             _ => panic!("Unknown operation {}", s),
         }
     }
@@ -193,7 +214,7 @@ mod tests {
     #[test]
     fn test_parse_monkeys() {
         let example = read_example(11);
-        let monkeys = Monkeys::parse(&example);
+        let monkeys = Monkeys::parse(&example, true);
 
         assert_eq!(monkeys.0.len(), 4);
         assert_eq!(monkeys.0[0].items.len(), 2);
@@ -206,14 +227,14 @@ mod tests {
     #[test]
     fn test_worry() {
         let example = read_example(11);
-        let mut monkeys = Monkeys::parse(&example);
+        let mut monkeys = Monkeys::parse(&example, true);
         let monkey = monkeys.0.get_mut(0).unwrap();
 
-        let (target1, item1) = monkey.inspect();
+        let (target1, item1) = monkey.inspect(1);
         assert_eq!(target1, 3);
         assert_eq!(item1, 500);
 
-        let (target2, item2) = monkey.inspect();
+        let (target2, item2) = monkey.inspect(1);
         assert_eq!(target2, 3);
         assert_eq!(item2, 620);
     }
@@ -221,7 +242,7 @@ mod tests {
     #[test]
     fn test_run_one_round() {
         let example = read_example(11);
-        let mut monkeys = Monkeys::parse(&example);
+        let mut monkeys = Monkeys::parse(&example, true);
         monkeys.run_round();
 
         assert_eq!(monkeys.0[0].items.len(), 4);
@@ -238,5 +259,13 @@ mod tests {
         let solution = solve_part_1(&example).unwrap();
 
         assert_eq!(solution, 10605)
+    }
+
+    #[test]
+    fn test_solve_part_2() {
+        let example = read_example(11);
+        let solution = solve_part_2(&example).unwrap();
+
+        assert_eq!(solution, 2713310158)
     }
 }
