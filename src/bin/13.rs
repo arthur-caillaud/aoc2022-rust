@@ -7,6 +7,7 @@ use regex::Regex;
 fn main() {
     let input = &read_input(13);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
 }
 
 fn solve_part_1(input: &str) -> Option<usize> {
@@ -23,9 +24,35 @@ fn solve_part_1(input: &str) -> Option<usize> {
     Some(ordered_pairs_idx.sum())
 }
 
+fn solve_part_2(input: &str) -> Option<usize> {
+    let pairs = PacketPair::parse_multiple(input);
+    let mut packets = PacketPair::flat(pairs);
+
+    packets.push(Item::parse("[[2]]"));
+    packets.push(Item::parse("[[6]]"));
+
+    packets.sort_unstable_by(|lhs, rhs| Item::compare(lhs, rhs));
+
+    let packet_2_idx = Item::find_idx(&packets, &Item::parse("[[2]]"));
+    let packet_6_idx = Item::find_idx(&packets, &Item::parse("[[6]]"));
+
+    Some(packet_2_idx * packet_6_idx)
+}
+
 #[derive(Debug)]
 struct PacketPair(Packet, Packet);
 impl PacketPair {
+    // Flattens a list of `PacketPairs` into a list of `Packets`
+    fn flat(pairs: Vec<Self>) -> Vec<Packet> {
+        let mut packets = vec![];
+        pairs.iter().for_each(|pair| {
+            packets.push(pair.0.clone());
+            packets.push(pair.1.clone())
+        });
+
+        packets
+    }
+
     /// Parses the whole input into a list of `PacketPairs`
     fn parse_multiple(input: &str) -> Vec<Self> {
         input.split("\n\n").map(Self::parse).collect()
@@ -38,7 +65,6 @@ impl PacketPair {
     }
 
     fn correct_order(&self) -> bool {
-        println!("Using correct order on {:?}", self);
         self.0 < self.1
     }
 }
@@ -50,6 +76,17 @@ enum Item {
 }
 type Packet = Vec<Item>;
 impl Item {
+    /// Finds index of `Packet`
+    fn find_idx(packets: &Vec<Packet>, target: &Packet) -> usize {
+        let (packet_idx, _) = packets
+            .iter()
+            .enumerate()
+            .find(|(_, packet)| *packet == target)
+            .unwrap();
+
+        packet_idx + 1
+    }
+
     /// Compares 2 `Packets`
     fn compare(lhs: &Packet, rhs: &Packet) -> Ordering {
         for k in 0.. {
@@ -167,5 +204,13 @@ mod tests {
         let solution = solve_part_1(&input).unwrap();
 
         assert_eq!(solution, 13)
+    }
+
+    #[test]
+    fn test_solve_2() {
+        let input = read_example(13);
+        let solution = solve_part_2(&input).unwrap();
+
+        assert_eq!(solution, 140)
     }
 }
