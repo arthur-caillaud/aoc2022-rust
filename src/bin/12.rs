@@ -9,6 +9,21 @@ use petgraph::IntoWeightedEdge;
 fn main() {
     let input = &read_input(12);
     solve!(1, solve_part_1, input);
+    solve!(2, solve_part_2, input);
+}
+
+fn solve_part_2(input: &str) -> Option<usize> {
+    let mountains_bag = MountainsBag::parse(&input);
+    let mountains = Mountains::from(&mountains_bag);
+    let starts = mountains_bag.find_lowest();
+    let end = mountains_bag.find_end().unwrap();
+
+    let path = starts
+        .iter()
+        .map(|start| mountains.path_length(start.clone(), end))
+        .min();
+
+    path
 }
 
 fn solve_part_1(input: &str) -> Option<usize> {
@@ -29,7 +44,7 @@ impl Mountains {
     fn path_length(&self, from: Position, to: Position) -> usize {
         let res = dijkstra(&self.graph, from.into(), Some(to.into()), |_| 1 as usize);
 
-        res.get(&to.into()).unwrap().clone()
+        res.get(&to.into()).unwrap_or(&usize::MAX).clone()
     }
 
     fn from(mountains: &MountainsBag) -> Self {
@@ -53,6 +68,20 @@ impl MountainsBag {
 
     fn get(&self, pos: Position) -> &Mountain {
         &self.0[pos.0][pos.1]
+    }
+
+    fn find_lowest(&self) -> Vec<Position> {
+        let mut positions = vec![];
+
+        for i in 0..self.0.len() {
+            for j in 0..self.0[0].len() {
+                if self.get(Position(i, j)).height == 1 {
+                    positions.push(Position(i, j))
+                }
+            }
+        }
+
+        positions
     }
 
     fn find_start(&self) -> Option<Position> {
@@ -222,5 +251,13 @@ mod tests {
         let solution = solve_part_1(&example).unwrap();
 
         assert_eq!(solution, 31);
+    }
+
+    #[test]
+    fn test_solve_part_2() {
+        let example = read_example(12);
+        let solution = solve_part_2(&example).unwrap();
+
+        assert_eq!(solution, 29);
     }
 }
