@@ -9,20 +9,29 @@ fn main() {
     solve!(2, solve_part_2, input);
 }
 
+/// Solves the part 1 of the puzzle. Inserts sand until map is full. Floor deactivated.
+/// Return number of sand grains inserted.
 fn solve_part_1(input: &str) -> Option<usize> {
-    let mut map = Map::init(&input);
+    let mut map = Map::build(&input, false);
 
     while map.insert_sand() {}
 
     Some(map.sands.len())
 }
 
+/// Solves the part 2 of the puzzle. Inserts sand until map is full. Floor activated.
+/// Return number of sand grains inserted.
 fn solve_part_2(input: &str) -> Option<usize> {
-    None
+    let mut map = Map::build(&input, true);
+
+    while map.insert_sand() {}
+
+    Some(map.sands.len())
 }
 
 #[derive(Debug)]
 struct Map {
+    floor: Option<usize>,
     obstacles: HashSet<Position>,
     sands: HashSet<Position>,
     source: Position,
@@ -32,6 +41,10 @@ impl Map {
     /// Inserts a new sand from the source. Returns `true` if the sand was correctly inserted.
     /// Returns `false` if it fell indefinitely.
     fn insert_sand(&mut self) -> bool {
+        if self.obstacles.contains(&self.source) {
+            return false;
+        }
+
         if let Some(sand) = self.fall_from(&self.source) {
             self.sands.insert(sand);
             self.obstacles.insert(sand);
@@ -45,8 +58,8 @@ impl Map {
     /// where it should fall to otherwise.
     fn fall_from(&self, pos: &Position) -> Option<Position> {
         if let Some(first_obstacle) = self.find_obstacle_under(pos) {
-            if let Some(_) = self.find_obstacle_left(first_obstacle) {
-                if let Some(_) = self.find_obstacle_right(first_obstacle) {
+            if let Some(_) = self.find_obstacle_left(&first_obstacle) {
+                if let Some(_) = self.find_obstacle_right(&first_obstacle) {
                     Some((first_obstacle.0, first_obstacle.1 - 1))
                 } else {
                     self.fall_from(&(first_obstacle.0 + 1, first_obstacle.1))
@@ -60,36 +73,50 @@ impl Map {
     }
 
     /// May find a rock left to the provided `Position`
-    fn find_obstacle_left(&self, coord: &Position) -> Option<&Position> {
-        let right_pos = &(coord.0 - 1, coord.1);
-        self.obstacles
-            .get(right_pos)
-            .or_else(|| self.sands.get(right_pos))
+    fn find_obstacle_left(&self, coord: &Position) -> Option<Position> {
+        let left_pos = (coord.0 - 1, coord.1);
+        if self.obstacles.contains(&left_pos) || Some(coord.1) == self.floor {
+            Some(left_pos)
+        } else {
+            None
+        }
     }
 
     /// May find a rock right to the provided `Position`
-    fn find_obstacle_right(&self, coord: &Position) -> Option<&Position> {
-        let left_pos = &(coord.0 + 1, coord.1);
-        self.obstacles
-            .get(left_pos)
-            .or_else(|| self.sands.get(left_pos))
+    fn find_obstacle_right(&self, coord: &Position) -> Option<Position> {
+        let right_pos = (coord.0 + 1, coord.1);
+        if self.obstacles.contains(&right_pos) || Some(coord.1) == self.floor {
+            Some(right_pos)
+        } else {
+            None
+        }
     }
 
     /// May find a rock under the provided `Position`
-    fn find_obstacle_under(&self, coord: &Position) -> Option<&Position> {
+    fn find_obstacle_under(&self, coord: &Position) -> Option<Position> {
         self.obstacles
             .iter()
-            .filter(|rock| coord.0 == rock.0 && coord.1 < rock.1)
-            .min_by(|pos1, pos2| pos1.1.cmp(&pos2.1))
+            .filter(|&&(x, y)| x == coord.0 && y > coord.1)
+            .min_by_key(|&&(_, y)| y)
+            .cloned()
+            .or_else(|| {
+                if let Some(floor) = self.floor {
+                    Some((coord.0, floor))
+                } else {
+                    None
+                }
+            })
     }
 
-    /// Initializes the `Map` from the `str` input
-    fn init(input: &str) -> Self {
+    /// Builds the `Map` from the `str` input
+    fn build(input: &str, with_floor: bool) -> Self {
         let mut map = Self {
+            floor: None,
             obstacles: HashSet::new(),
             source: (500, 0),
             sands: HashSet::new(),
         };
+
         input.lines().map(Self::parse_line).for_each(|coords| {
             (0..coords.len() - 1).for_each(|k| {
                 let from = coords.get(k).unwrap();
@@ -98,7 +125,22 @@ impl Map {
             })
         });
 
+        if with_floor {
+            map.floor = map.find_floor();
+        }
+
         map
+    }
+
+    /// Finds the Y coordinate of the floor
+    fn find_floor(&self) -> Option<usize> {
+        let bottom = self
+            .obstacles
+            .iter()
+            .max_by(|pos_a, pos_b| pos_a.1.cmp(&pos_b.1))
+            .unwrap();
+
+        Some(bottom.1 + 2)
     }
 
     /// Insert rocks in the map between the provided `Positions`
@@ -138,7 +180,7 @@ mod tests {
     #[test]
     fn test_parse_input() {
         let input = read_example(14);
-        let map = Map::init(&input);
+        let map = Map::build(&input, false);
 
         assert_eq!(map.obstacles.len(), 20);
 
@@ -153,12 +195,12 @@ mod tests {
     #[test]
     fn test_rock_under() {
         let input = read_example(14);
-        let map = Map::init(&input);
+        let map = Map::build(&input, false);
 
         let rock1 = map.find_obstacle_under(&map.source).unwrap();
-        assert_eq!(rock1, &(500, 9));
+        assert_eq!(rock1, (500, 9));
         let rock2 = map.find_obstacle_under(&(498, 0)).unwrap();
-        assert_eq!(rock2, &(498, 4));
+        assert_eq!(rock2, (498, 4));
         let no_rock = map.find_obstacle_under(&(493, 0));
         assert_eq!(no_rock, None);
     }
@@ -166,7 +208,7 @@ mod tests {
     #[test]
     fn test_insert_sand() {
         let input = read_example(14);
-        let mut map = Map::init(&input);
+        let mut map = Map::build(&input, false);
 
         map.insert_sand(); // Insert 1st sand grain
         assert_ne!(map.sands.get(&(500, 8)), None);
@@ -174,9 +216,9 @@ mod tests {
         map.insert_sand(); // Insert 2nd sand grain
         assert_ne!(map.sands.get(&(499, 8)), None);
 
-        assert_eq!(map.insert_sand(), true);
-        assert_eq!(map.insert_sand(), true);
-        assert_eq!(map.insert_sand(), true);
+        assert_eq!(map.insert_sand(), true); // Insert 3rd sand grain
+        assert_eq!(map.insert_sand(), true); // Insert 4th sand grain
+        assert_eq!(map.insert_sand(), true); // Insert 5th sand grain
         assert_eq!(map.sands.contains(&(500, 7)), true);
         assert_eq!(map.sands.len(), 5);
     }
@@ -187,5 +229,21 @@ mod tests {
         let solution = solve_part_1(&input).unwrap();
 
         assert_eq!(solution, 24)
+    }
+
+    #[test]
+    fn test_find_floor() {
+        let input = read_example(14);
+        let map = Map::build(&input, true);
+
+        assert_eq!(map.find_floor().unwrap(), 11)
+    }
+
+    #[test]
+    fn test_solve_part_2() {
+        let input = read_example(14);
+        let solution = solve_part_2(&input).unwrap();
+
+        assert_eq!(solution, 93)
     }
 }
