@@ -1,6 +1,7 @@
 use advent_of_code::helpers::*;
 use advent_of_code::solve;
 use regex::Regex;
+use std::ops::RangeInclusive;
 
 fn main() {
     let input = &read_input(15);
@@ -10,19 +11,23 @@ fn main() {
 
 fn solve_part_1(input: &str) -> Option<usize> {
     let map = Map::from(input);
-    Some(map.count_covered_row(2000000))
+    let solution = map.count_covered_row(2000000);
+
+    Some(solution)
 }
 
-fn solve_part_2(input: &str) -> Option<u64> {
-    None
+fn solve_part_2(input: &str) -> Option<isize> {
+    let map = Map::from(input);
+    let not_covered = map.find_not_covered(0..=4000000, 0..=4000000);
+    let solution = not_covered.tuning_frequency();
+
+    Some(solution)
 }
 
 struct Map {
     sensors: Vec<Sensor>,
     x_max: isize,
     x_min: isize,
-    y_max: isize,
-    y_min: isize,
 }
 impl From<Vec<Sensor>> for Map {
     fn from(sensors: Vec<Sensor>) -> Self {
@@ -36,23 +41,11 @@ impl From<Vec<Sensor>> for Map {
             .map(|sensor| sensor.pos.x + sensor.distance_to_closest)
             .max()
             .unwrap();
-        let y_min = sensors
-            .iter()
-            .map(|sensor| sensor.pos.y - sensor.distance_to_closest)
-            .min()
-            .unwrap();
-        let y_max = sensors
-            .iter()
-            .map(|sensor| sensor.pos.y + sensor.distance_to_closest)
-            .max()
-            .unwrap();
 
         Self {
             sensors,
             x_max,
             x_min,
-            y_max,
-            y_min,
         }
     }
 }
@@ -68,36 +61,46 @@ impl Map {
     /// Counts the number of cells covered on row `y`
     fn count_covered_row(&self, y: isize) -> usize {
         self.walk_row(y)
-            .iter()
             .filter(|cell| self.is_covered(cell))
             .count()
     }
 
-    /// Counts the number of cells covered on column `x`
-    fn count_covered_col(&self, x: isize) -> usize {
-        self.walk_col(x)
-            .iter()
-            .filter(|cell| self.is_covered(cell))
-            .count()
+    /// Filters the input `Positions` to retrieve the ones that are not covered
+    fn find_not_covered(
+        &self,
+        x_range: RangeInclusive<isize>,
+        y_range: RangeInclusive<isize>,
+    ) -> Position {
+        self.walk(x_range, y_range)
+            .find(|position| self.is_not_covered(position))
+            .unwrap()
+            .clone()
     }
 
     /// Returns whether the provided `Position` is covered by one of the `Map` sensors
     fn is_covered(&self, pos: &Position) -> bool {
-        self.sensors.iter().any(|sensor| sensor.is_covered(pos))
+        self.sensors.iter().any(|sensor| sensor.not_beacon(pos))
+    }
+
+    /// Returns whether the provided `Position` is not covered by any of the `Map` sensors
+    fn is_not_covered(&self, pos: &Position) -> bool {
+        self.sensors
+            .iter()
+            .all(|sensor| sensor.possible_beacon(pos))
     }
 
     /// Walks the line defined by `y` up to the boundaries of the `Map`
-    fn walk_row(&self, y: isize) -> Vec<Position> {
-        (self.x_min..=self.x_max)
-            .map(|x| Position { x, y })
-            .collect()
+    fn walk_row(&self, y: isize) -> impl Iterator<Item = Position> + '_ {
+        (self.x_min..=self.x_max).map(move |x| Position { x, y })
     }
 
-    /// Walks the col defined by `x` up to the boundaries of the `Map`
-    fn walk_col(&self, x: isize) -> Vec<Position> {
-        (self.y_min..=self.y_max)
-            .map(|y| Position { x, y })
-            .collect()
+    /// Walks the portion of the `Map` delimited by the provided `x_range` and `y_range`
+    fn walk(
+        &self,
+        x_range: RangeInclusive<isize>,
+        y_range: RangeInclusive<isize>,
+    ) -> impl Iterator<Item = Position> + '_ {
+        x_range.flat_map(move |x| y_range.clone().map(move |y| Position { x, y }))
     }
 }
 
@@ -118,9 +121,24 @@ impl From<&(Position, Position)> for Sensor {
     }
 }
 impl Sensor {
+    /// Whether the provided `Position` cannot be a beacon
+    fn not_beacon(&self, pos: &Position) -> bool {
+        !self.is_detected(pos) && self.is_covered(pos)
+    }
+
+    /// Whether the provided `Position` can be a unknown beacon
+    fn possible_beacon(&self, pos: &Position) -> bool {
+        !self.is_detected(pos) && !self.is_covered(pos)
+    }
+
     /// Returns whether the provided `Position` is covered
     fn is_covered(&self, pos: &Position) -> bool {
-        pos != &self.closest_beacon && self.pos.distance(pos) <= self.distance_to_closest
+        Position::distance(&self.pos, pos) <= self.distance_to_closest
+    }
+
+    /// Returns whether the provided `Position` is detected as a beacon
+    fn is_detected(&self, pos: &Position) -> bool {
+        pos == &self.closest_beacon
     }
 }
 
@@ -159,6 +177,11 @@ impl Position {
     fn distance(&self, beacon: &Position) -> isize {
         (self.x.abs_diff(beacon.x) + self.y.abs_diff(beacon.y)) as isize
     }
+
+    /// Computes the tuning frequency for the `Position`
+    fn tuning_frequency(&self) -> isize {
+        self.x * 4000000 + self.y
+    }
 }
 
 #[cfg(test)]
@@ -184,11 +207,21 @@ mod tests {
     }
 
     #[test]
-    fn test_count_covered_row() {
+    fn test_solve_part_1() {
         let example = read_example(15);
         let map = Map::from(example.as_str());
         let solution = map.count_covered_row(10);
 
         assert_eq!(solution, 26);
+    }
+
+    #[test]
+    fn test_solve_part_2() {
+        let example = read_example(15);
+        let map = Map::from(example.as_str());
+
+        let not_covered = map.find_not_covered(0..=20, 0..=20);
+        let tun_freq = not_covered.tuning_frequency();
+        assert_eq!(tun_freq, 56000011);
     }
 }
