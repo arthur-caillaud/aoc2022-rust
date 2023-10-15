@@ -2,6 +2,8 @@
 scaffold = "run --bin scaffold --quiet --release -- "
 download = "run --bin download --quiet --release -- "
 read = "run --bin read --quiet --release -- "
-
 solve = "run --bin"
 all = "run"
+
+[build]
+target = "aarch64-apple-darwin"
