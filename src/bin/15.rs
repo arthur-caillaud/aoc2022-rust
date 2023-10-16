@@ -1,5 +1,6 @@
 use advent_of_code::helpers::*;
 use advent_of_code::solve;
+use rayon::prelude::*;
 use regex::Regex;
 use std::ops::RangeInclusive;
 
@@ -71,10 +72,24 @@ impl Map {
         x_range: RangeInclusive<isize>,
         y_range: RangeInclusive<isize>,
     ) -> Position {
-        self.walk(x_range, y_range)
-            .find(|position| self.is_not_covered(position))
+        x_range
+            .into_par_iter()
+            .flat_map(move |x| {
+                y_range
+                    .clone()
+                    .filter_map(move |y| {
+                        let position = Position { x, y };
+                        if self.is_not_covered(&position) {
+                            Some(position)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .into_par_iter()
+            })
+            .find_any(|_| true)
             .unwrap()
-            .clone()
     }
 
     /// Returns whether the provided `Position` is covered by one of the `Map` sensors
@@ -92,15 +107,6 @@ impl Map {
     /// Walks the line defined by `y` up to the boundaries of the `Map`
     fn walk_row(&self, y: isize) -> impl Iterator<Item = Position> + '_ {
         (self.x_min..=self.x_max).map(move |x| Position { x, y })
-    }
-
-    /// Walks the portion of the `Map` delimited by the provided `x_range` and `y_range`
-    fn walk(
-        &self,
-        x_range: RangeInclusive<isize>,
-        y_range: RangeInclusive<isize>,
-    ) -> impl Iterator<Item = Position> + '_ {
-        x_range.flat_map(move |x| y_range.clone().map(move |y| Position { x, y }))
     }
 }
 

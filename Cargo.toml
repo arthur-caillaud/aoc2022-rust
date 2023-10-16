@@ -10,4 +10,5 @@ publish = false
 [dependencies]
 petgraph = "0.6.4"
 pico-args = "0.5.0"
+rayon = "1.8.0"
 regex = "1.9.5"
